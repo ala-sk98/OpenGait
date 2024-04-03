@@ -24,15 +24,24 @@ ls *.tgz | xargs -n1 tar xzvf
 
 After unpacking these compressed files, run this command:
 
-Step2 : To rearrange directory of GREW dataset, turning to id-type-view structure, Run 
+Step2-1 : To rearrange directory of GREW dataset(for silhouette), turning to id-type-view structure, Run 
 ```
 python datasets/GREW/rearrange_GREW.py --input_path Path_of_GREW-raw --output_path Path_of_GREW-rearranged
 ```  
+Step2-2 : To rearrange directory of GREW dataset(for pose), turning to id-type-view structure, Run 
+```
+python datasets/GREW/rearrange_GREW_pose.py --input_path Path_of_GREW-pose --output_path Path_of_GREW-pose-rearranged
+```  
 
-Step3: Transforming images to pickle file, run 
+Step3-1: Transforming images to pickle file, run 
 ```
 python datasets/pretreatment.py --input_path Path_of_GREW-rearranged --output_path Path_of_GREW-pkl --dataset GREW
 ```
+Step3-2: Transforming pose txts to pickle file, run 
+```
+python datasets/pretreatment.py --input_path Path_of_GREW-pose-rearranged --output_path Path_of_GREW-pose-pkl --pose --dataset GREW
+```
+
 Then you will see the structure like:
 
 - Processed
@@ -74,4 +83,4 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nproc_per_node
 The result will be generated in your working directory, you must rename and compress it as the requirements before submitting.
 
 ## Evaluation locally
-While the original grew treat both seq_01 and seq_02 as gallery, but there is no ground truth for probe. Therefore, it is nessesary to upload the submission file on grew competitation. We seperate test set to: seq_01 as gallery, seq_02 as probe. Then you can modify `eval_func` in the `./config/baseline/baseline_GREW.yaml` to `identification_real_scene`, you can obtain result localy like setting of OUMVLP. 
+While the original grew treat both seq_01 and seq_02 as gallery, but there is no ground truth for probe. Therefore, it is nessesary to upload the submission file on grew competitation. We seperate test set to: seq_01 as gallery, seq_02 as probe. Then you can modify `eval_func` in the `./config/baseline/baseline_GREW.yaml` to `evaluate_real_scene`, you can obtain result localy like setting of OUMVLP. 

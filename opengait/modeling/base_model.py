@@ -144,6 +144,7 @@ class BaseModel(MetaModel, nn.Module):
 
         self.build_network(cfgs['model_cfg'])
         self.init_parameters()
+        self.trainer_trfs = get_transform(cfgs['trainer_cfg']['transform'])
 
         self.msg_mgr.log_info(cfgs['data_cfg'])
         if training:
@@ -152,6 +153,8 @@ class BaseModel(MetaModel, nn.Module):
         if not training or self.engine_cfg['with_test']:
             self.test_loader = self.get_loader(
                 cfgs['data_cfg'], train=False)
+            self.evaluator_trfs = get_transform(
+                cfgs['evaluator_cfg']['transform'])
 
         self.device = torch.distributed.get_rank()
         torch.cuda.set_device(self.device)
@@ -299,8 +302,7 @@ class BaseModel(MetaModel, nn.Module):
             tuple: training data including inputs, labels, and some meta data.
         """
         seqs_batch, labs_batch, typs_batch, vies_batch, seqL_batch = inputs
-        trf_cfgs = self.engine_cfg['transform']
-        seq_trfs = get_transform(trf_cfgs)
+        seq_trfs = self.trainer_trfs if self.training else self.evaluator_trfs
         if len(seqs_batch) != len(seq_trfs):
             raise ValueError(
                 "The number of types of input data and transform should be same. But got {} and {}".format(len(seqs_batch), len(seq_trfs)))
@@ -436,7 +438,10 @@ class BaseModel(MetaModel, nn.Module):
     @ staticmethod
     def run_test(model):
         """Accept the instance object(model) here, and then run the test loop."""
-
+        evaluator_cfg = model.cfgs['evaluator_cfg']
+        if torch.distributed.get_world_size() != evaluator_cfg['sampler']['batch_size']:
+            raise ValueError("The batch size ({}) must be equal to the number of GPUs ({}) in testing mode!".format(
+                evaluator_cfg['sampler']['batch_size'], torch.distributed.get_world_size()))
         rank = torch.distributed.get_rank()
         with torch.no_grad():
             info_dict = model.inference(rank)
@@ -449,13 +454,13 @@ class BaseModel(MetaModel, nn.Module):
             info_dict.update({
                 'labels': label_list, 'types': types_list, 'views': views_list})
 
-            if 'eval_func' in model.cfgs["evaluator_cfg"].keys():
-                eval_func = model.cfgs['evaluator_cfg']["eval_func"]
+            if 'eval_func' in evaluator_cfg.keys():
+                eval_func = evaluator_cfg["eval_func"]
             else:
                 eval_func = 'identification'
             eval_func = getattr(eval_functions, eval_func)
             valid_args = get_valid_args(
-                eval_func, model.cfgs["evaluator_cfg"], ['metric'])
+                eval_func, evaluator_cfg, ['metric'])
             try:
                 dataset_name = model.cfgs['data_cfg']['test_dataset_name']
             except:
